@@ -6,12 +6,23 @@
 </head>
 <body>
   <div class="container">
-    <h2>IP批量查询</h2>
+    <div class="header">
+      <h2>IP批量查询</h2>
+      <button id="clearButton" class="btn-clear">清除IP</button>
+    </div>
     <textarea id="ipInput" placeholder="请输入IP地址，每行一个"></textarea>
     <div class="button-group">
       <button id="dedupeButton" class="btn-secondary">去重</button>
       <button id="copyButton" class="btn-secondary">复制</button>
       <button id="queryButton" class="btn-primary">查询</button>
+    </div>
+    <div id="filterButtons" class="filter-group" style="display: none;">
+      <button class="btn-filter" data-filter="foreign">国外</button>
+      <button class="btn-filter" data-filter="mobile">移动</button>
+      <button class="btn-filter" data-filter="telecom">电信</button>
+      <button class="btn-filter" data-filter="unicom">联通</button>
+      <button class="btn-filter" data-filter="hmt">港澳台</button>
+      <button class="btn-filter" data-filter="other">其他</button>
     </div>
     <div id="results"></div>
   </div>

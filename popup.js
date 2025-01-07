@@ -2,8 +2,24 @@ document.addEventListener('DOMContentLoaded', function() {
   const queryButton = document.getElementById('queryButton');
   const dedupeButton = document.getElementById('dedupeButton');
   const copyButton = document.getElementById('copyButton');
+  const clearButton = document.getElementById('clearButton');
   const ipInput = document.getElementById('ipInput');
   const results = document.getElementById('results');
+  const filterButtons = document.getElementById('filterButtons');
+  let allResults = []; // 存储所有查询结果
+
+  // 加载保存的数据
+  loadSavedData();
+
+  // 清除功能
+  clearButton.addEventListener('click', () => {
+    ipInput.value = '';
+    results.innerHTML = '';
+    // 清除保存的数据
+    chrome.storage.local.remove(['savedIPs', 'savedResults'], () => {
+      results.innerHTML = '<p>数据已清除</p>';
+    });
+  });
 
   // 去重功能
   dedupeButton.addEventListener('click', () => {
@@ -12,17 +28,18 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
-    // 使用Set去重并保持原有顺序
     const uniqueIps = [...new Set(ips)];
     ipInput.value = uniqueIps.join('\n');
     
-    // 显示去重结果
     const removedCount = ips.length - uniqueIps.length;
     if (removedCount > 0) {
       results.innerHTML = `<p>已去除 ${removedCount} 个重复IP</p>`;
     } else {
       results.innerHTML = '<p>没有发现重复IP</p>';
     }
+
+    // 保存输入的IP
+    saveData();
   });
 
   // 复制功能
@@ -36,7 +53,6 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
-    // 创建临时textarea来实现复制
     const textarea = document.createElement('textarea');
     textarea.value = resultsText;
     document.body.appendChild(textarea);
@@ -62,9 +78,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     results.innerHTML = '<p>正在查询中...</p>';
+    filterButtons.style.display = 'none';
     
     try {
-      // 串行查询所有IP
       const responses = [];
       for (const ip of ips) {
         try {
@@ -81,42 +97,131 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       }
 
-      // 更新结果显示
-      const resultsDiv = document.getElementById('results');
-      if (!responses || responses.length === 0) {
-        resultsDiv.innerHTML = '<p>未查询到结果</p>';
-        return;
-      }
-
-      const html = responses.map(item => {
-        if (item.code === 200) {
-          // 格式化地理位置信息
-          const location = [
-            item.data.continent,
-            item.data.country,
-            item.data.prov,
-            item.data.city
-          ].filter(Boolean).join('-');  // 过滤掉空值并用-连接
-
-          return `
-            <div class="result-item">
-              <p>${item.data.ip} => ${location}-${item.data.isp}</p>
-            </div>
-          `;
-        } else {
-          return `
-            <div class="result-item error">
-              <p>${item.ip} => 查询失败: ${item.msg || '未知错误'}</p>
-            </div>
-          `;
-        }
-      }).join('');
-
-      resultsDiv.innerHTML = html;
+      allResults = responses; // 保存所有结果
+      displayResults(responses);
+      filterButtons.style.display = 'flex'; // 显示筛选按钮
 
     } catch (error) {
       results.innerHTML = `<p class="error">查询出错: ${error.message}</p>`;
       console.error('查询错误:', error);
     }
   });
+
+  // 筛选功能
+  filterButtons.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('btn-filter')) return;
+    
+    const button = e.target;
+    const filterType = button.dataset.filter;
+
+    // 切换按钮状态
+    if (button.classList.contains('active')) {
+      // 如果按钮已经是激活状态，则取消选中并显示所有结果
+      button.classList.remove('active');
+      displayResults(allResults);
+    } else {
+      // 取消其他按钮的选中状态
+      document.querySelectorAll('.btn-filter').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      // 选中当前按钮并过滤结果
+      button.classList.add('active');
+      const filteredResults = filterResults(allResults, filterType);
+      displayResults(filteredResults);
+    }
+  });
+
+  function filterResults(results, type) {
+    return results.filter(item => {
+      if (!item.code === 200) return false;
+      
+      const isp = item.data.isp?.toLowerCase() || '';
+      const country = item.data.country || '';
+      const region = item.data.prov || '';
+
+      switch (type) {
+        case 'foreign':
+          return country && country !== '中国';
+        case 'mobile':
+          return isp.includes('移动');
+        case 'telecom':
+          return isp.includes('电信');
+        case 'unicom':
+          return isp.includes('联通');
+        case 'hmt':
+          return region.includes('香港') || 
+                 region.includes('澳门') || 
+                 region.includes('台湾');
+        case 'other':
+          return !isp.includes('移动') && 
+                 !isp.includes('电信') && 
+                 !isp.includes('联通') &&
+                 country === '中国' &&
+                 !region.includes('香港') && 
+                 !region.includes('澳门') && 
+                 !region.includes('台湾');
+        default:
+          return true;
+      }
+    });
+  }
+
+  function displayResults(results) {
+    const resultsDiv = document.getElementById('results');
+    if (!results || results.length === 0) {
+      resultsDiv.innerHTML = '<p>未查询到结果</p>';
+      return;
+    }
+
+    const html = results.map(item => {
+      if (item.code === 200) {
+        const location = [
+          // 移除 continent 字段
+          item.data.country,
+          item.data.prov,
+          item.data.city
+        ].filter(Boolean).join('-');
+
+        return `
+          <div class="result-item">
+            <p>${item.data.ip} => ${location}-${item.data.isp}</p>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="result-item error">
+            <p>${item.ip} => 查询失败: ${item.msg || '未知错误'}</p>
+          </div>
+        `;
+      }
+    }).join('');
+
+    resultsDiv.innerHTML = html;
+    saveData(html);
+  }
+
+  // 监听输入变化，保存数据
+  ipInput.addEventListener('input', () => {
+    saveData();
+  });
+
+  // 保存数据函数
+  function saveData(resultsHtml) {
+    chrome.storage.local.set({
+      savedIPs: ipInput.value,
+      savedResults: resultsHtml || results.innerHTML
+    });
+  }
+
+  // 加载保存的数据函数
+  function loadSavedData() {
+    chrome.storage.local.get(['savedIPs', 'savedResults'], (data) => {
+      if (data.savedIPs) {
+        ipInput.value = data.savedIPs;
+      }
+      if (data.savedResults) {
+        results.innerHTML = data.savedResults;
+      }
+    });
+  }
 }); 
