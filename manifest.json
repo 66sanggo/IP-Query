@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "IP批量查询工具",
-  "version": "1.0",
+  "version": "1.5",
   "description": "批量查询IP地址信息的Chrome扩展",
   "icons": {
     "16": "icons/icon16.png",
@@ -13,7 +13,9 @@
     "activeTab"
   ],
   "host_permissions": [
-    "https://api.qjqq.cn/*"
+    "https://api.qjqq.cn/*",
+    "https://ip.useragentinfo.com/*",
+    "https://api.mir6.com/*"
   ],
   "action": {
     "default_popup": "popup.html",

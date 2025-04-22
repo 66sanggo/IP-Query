@@ -15,8 +15,10 @@ document.addEventListener('DOMContentLoaded', function() {
   clearButton.addEventListener('click', () => {
     ipInput.value = '';
     results.innerHTML = '';
+    filterButtons.style.display = 'none';
+    allResults = []; // 清空查询结果数组
     // 清除保存的数据
-    chrome.storage.local.remove(['savedIPs', 'savedResults'], () => {
+    chrome.storage.local.remove(['savedIPs', 'savedResults', 'hasResults', 'allResultsData'], () => {
       results.innerHTML = '<p>数据已清除</p>';
     });
   });
@@ -84,8 +86,22 @@ document.addEventListener('DOMContentLoaded', function() {
       const responses = [];
       for (const ip of ips) {
         try {
-          const response = await fetch(`https://api.qjqq.cn/api/district?ip=${ip}`);
-          const data = await response.json();
+          // 使用Mir6 API接口
+          const response = await fetch(`https://api.mir6.com/api/ip?ip=${ip}&type=json`);
+          const mirData = await response.json();
+          
+          // 将Mir6 API返回数据转换为与原接口兼容的格式
+          const data = {
+            code: 200,
+            data: {
+              ip: mirData.data.ip || ip,
+              country: mirData.data.country || '',
+              prov: mirData.data.province || '',
+              city: mirData.data.city || '',
+              isp: mirData.data.isp || '',
+            }
+          };
+          
           responses.push(data);
         } catch (error) {
           console.error('查询失败:', ip, error);
@@ -133,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function filterResults(results, type) {
     return results.filter(item => {
-      if (!item.code === 200) return false;
+      if (item.code !== 200) return false;
       
       const isp = item.data.isp?.toLowerCase() || '';
       const country = item.data.country || '';
@@ -175,16 +191,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const html = results.map(item => {
       if (item.code === 200) {
-        const location = [
-          // 移除 continent 字段
-          item.data.country,
-          item.data.prov,
-          item.data.city
-        ].filter(Boolean).join('-');
+        // 收集有效的位置信息
+        const locationParts = [];
+        if (item.data.country) locationParts.push(item.data.country);
+        if (item.data.prov) locationParts.push(item.data.prov);
+        if (item.data.city) locationParts.push(item.data.city);
+        
+        // 生成位置字符串
+        let locationStr = locationParts.join('-');
+        
+        // 如果有ISP信息，添加到位置信息后面
+        if (item.data.isp) {
+          locationStr = locationStr ? `${locationStr}-${item.data.isp}` : item.data.isp;
+        }
 
         return `
           <div class="result-item">
-            <p>${item.data.ip} => ${location}-${item.data.isp}</p>
+            <p>${item.data.ip} => ${locationStr}</p>
           </div>
         `;
       } else {
@@ -205,23 +228,46 @@ document.addEventListener('DOMContentLoaded', function() {
     saveData();
   });
 
-  // 保存数据函数
-  function saveData(resultsHtml) {
-    chrome.storage.local.set({
-      savedIPs: ipInput.value,
-      savedResults: resultsHtml || results.innerHTML
-    });
-  }
-
   // 加载保存的数据函数
   function loadSavedData() {
-    chrome.storage.local.get(['savedIPs', 'savedResults'], (data) => {
+    chrome.storage.local.get(['savedIPs', 'savedResults', 'hasResults', 'allResultsData'], (data) => {
       if (data.savedIPs) {
         ipInput.value = data.savedIPs;
       }
       if (data.savedResults) {
         results.innerHTML = data.savedResults;
       }
+      // 恢复所有查询结果数据
+      if (data.allResultsData) {
+        try {
+          allResults = JSON.parse(data.allResultsData);
+        } catch (e) {
+          console.error('恢复查询结果数据失败:', e);
+          allResults = [];
+        }
+      }
+      // 如果有查询结果，显示筛选按钮
+      if (data.hasResults) {
+        filterButtons.style.display = 'flex';
+      }
+    });
+  }
+
+  // 保存数据函数
+  function saveData(resultsHtml) {
+    // 尝试将allResults数组转换为JSON字符串
+    let allResultsData = '';
+    try {
+      allResultsData = JSON.stringify(allResults);
+    } catch (e) {
+      console.error('保存查询结果数据失败:', e);
+    }
+
+    chrome.storage.local.set({
+      savedIPs: ipInput.value,
+      savedResults: resultsHtml || results.innerHTML,
+      hasResults: resultsHtml || results.innerHTML.includes('result-item'),
+      allResultsData: allResultsData
     });
   }
 }); 
