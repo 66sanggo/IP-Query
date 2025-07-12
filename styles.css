@@ -133,4 +133,28 @@ textarea {
   background-color: #4CAF50;
   color: white;
   border-color: #4CAF50;
+}
+
+.statistics {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin: 10px 0;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.stat-success {
+  color: #4CAF50;
+}
+
+.stat-failed {
+  color: #f44336;
+}
+
+.stat-total {
+  color: #666;
 } 
