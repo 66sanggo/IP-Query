@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const statistics = document.getElementById('statistics');
   const successCount = document.getElementById('successCount');
   const failedCount = document.getElementById('failedCount');
+  const mobileCount = document.getElementById('mobileCount');
   const totalCount = document.getElementById('totalCount');
   let allResults = []; // 存储所有查询结果
 
@@ -22,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function() {
     filterButtons.style.display = 'none';
     statistics.style.display = 'none';
     allResults = []; // 清空查询结果数组
-    updateStatistics(0, 0, 0);
+    updateStatistics(0, 0, 0, 0);
     // 清除保存的数据
     chrome.storage.local.remove(['savedIPs', 'savedResults', 'hasResults', 'allResultsData'], () => {
       results.innerHTML = '<p>数据已清除</p>';
@@ -126,8 +127,9 @@ document.addEventListener('DOMContentLoaded', function() {
       // 计算并显示统计信息
       const successfulQueries = responses.filter(r => r.code === 200).length;
       const failedQueries = responses.filter(r => r.code !== 200).length;
+      const mobileQueries = responses.filter(r => r.code === 200 && r.data.isp && r.data.isp.includes('移动')).length;
       const totalQueries = responses.length;
-      updateStatistics(successfulQueries, failedQueries, totalQueries);
+      updateStatistics(successfulQueries, failedQueries, totalQueries, mobileQueries);
       statistics.style.display = 'flex';
 
     } catch (error) {
@@ -266,22 +268,24 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 恢复统计信息
         if (data.statistics) {
-          updateStatistics(data.statistics.success, data.statistics.failed, data.statistics.total);
+          updateStatistics(data.statistics.success, data.statistics.failed, data.statistics.total, data.statistics.mobile || 0);
         } else if (allResults.length > 0) {
           // 如果没有保存的统计信息但有结果数据，重新计算
           const successfulQueries = allResults.filter(r => r.code === 200).length;
           const failedQueries = allResults.filter(r => r.code !== 200).length;
+          const mobileQueries = allResults.filter(r => r.code === 200 && r.data.isp && r.data.isp.includes('移动')).length;
           const totalQueries = allResults.length;
-          updateStatistics(successfulQueries, failedQueries, totalQueries);
+          updateStatistics(successfulQueries, failedQueries, totalQueries, mobileQueries);
         }
       }
     });
   }
 
   // 保存数据函数
-  function updateStatistics(success, failed, total) {
+  function updateStatistics(success, failed, total, mobile) {
     successCount.textContent = success;
     failedCount.textContent = failed;
+    mobileCount.textContent = mobile;
     totalCount.textContent = total;
   }
 
@@ -297,6 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // 计算统计信息
     const successfulQueries = allResults.filter(r => r.code === 200).length;
     const failedQueries = allResults.filter(r => r.code !== 200).length;
+    const mobileQueries = allResults.filter(r => r.code === 200 && r.data.isp && r.data.isp.includes('移动')).length;
     const totalQueries = allResults.length;
 
     chrome.storage.local.set({
@@ -307,6 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
       statistics: {
         success: successfulQueries,
         failed: failedQueries,
+        mobile: mobileQueries,
         total: totalQueries
       }
     });
