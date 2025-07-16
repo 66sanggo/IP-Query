@@ -6,11 +6,6 @@ document.addEventListener('DOMContentLoaded', function() {
   const ipInput = document.getElementById('ipInput');
   const results = document.getElementById('results');
   const filterButtons = document.getElementById('filterButtons');
-  const statistics = document.getElementById('statistics');
-  const successCount = document.getElementById('successCount');
-  const failedCount = document.getElementById('failedCount');
-  const totalCount = document.getElementById('totalCount');
-  const mobileCount = document.getElementById('mobileCount');
   let allResults = []; // 存储所有查询结果
 
   // 加载保存的数据
@@ -23,7 +18,6 @@ document.addEventListener('DOMContentLoaded', function() {
     filterButtons.style.display = 'none';
     statistics.style.display = 'none';
     allResults = []; // 清空查询结果数组
-    updateStatistics(0, 0, 0, 0);
     // 清除保存的数据
     chrome.storage.local.remove(['savedIPs', 'savedResults', 'hasResults', 'allResultsData'], () => {
       results.innerHTML = '<p>数据已清除</p>';
@@ -123,14 +117,6 @@ document.addEventListener('DOMContentLoaded', function() {
       allResults = responses; // 保存所有结果
       displayResults(responses);
       filterButtons.style.display = 'flex'; // 显示筛选按钮
-      
-      // 计算并显示统计信息
-      const successfulQueries = responses.filter(r => r.code === 200).length;
-      const failedQueries = responses.filter(r => r.code !== 200).length;
-      const totalQueries = responses.length;
-      const mobileQueries = responses.filter(r => r.code === 200 && r.data.isp && r.data.isp.includes('移动')).length;
-      updateStatistics(successfulQueries, failedQueries, totalQueries, mobileQueries);
-      statistics.style.display = 'flex';
 
     } catch (error) {
       results.innerHTML = `<p class="error">查询出错: ${error.message}</p>`;
@@ -264,31 +250,11 @@ document.addEventListener('DOMContentLoaded', function() {
       // 如果有查询结果，显示筛选按钮和统计信息
       if (data.hasResults) {
         filterButtons.style.display = 'flex';
-        statistics.style.display = 'flex';
-        
-        // 恢复统计信息
-        if (data.statistics) {
-          updateStatistics(data.statistics.success, data.statistics.failed, data.statistics.total, data.statistics.mobile || 0);
-        } else if (allResults.length > 0) {
-          // 如果没有保存的统计信息但有结果数据，重新计算
-          const successfulQueries = allResults.filter(r => r.code === 200).length;
-          const failedQueries = allResults.filter(r => r.code !== 200).length;
-          const totalQueries = allResults.length;
-          const mobileQueries = allResults.filter(r => r.code === 200 && r.data.isp && r.data.isp.includes('移动')).length;
-          updateStatistics(successfulQueries, failedQueries, totalQueries, mobileQueries);
-        }
       }
     });
   }
 
   // 保存数据函数
-  function updateStatistics(success, failed, total, mobile) {
-    successCount.textContent = success;
-    failedCount.textContent = failed;
-    totalCount.textContent = total;
-    mobileCount.textContent = mobile || 0;
-  }
-
   function saveData(resultsHtml) {
     // 尝试将allResults数组转换为JSON字符串
     let allResultsData = '';
@@ -298,23 +264,11 @@ document.addEventListener('DOMContentLoaded', function() {
       console.error('保存查询结果数据失败:', e);
     }
 
-    // 计算统计信息
-    const successfulQueries = allResults.filter(r => r.code === 200).length;
-    const failedQueries = allResults.filter(r => r.code !== 200).length;
-    const totalQueries = allResults.length;
-    const mobileQueries = allResults.filter(r => r.code === 200 && r.data.isp && r.data.isp.includes('移动')).length;
-
     chrome.storage.local.set({
       savedIPs: ipInput.value,
       savedResults: resultsHtml || results.innerHTML,
       hasResults: resultsHtml || results.innerHTML.includes('result-item'),
-      allResultsData: allResultsData,
-      statistics: {
-        success: successfulQueries,
-        failed: failedQueries,
-        total: totalQueries,
-        mobile: mobileQueries
-      }
+      allResultsData: allResultsData
     });
   }
 }); 
